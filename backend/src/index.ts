@@ -1,6 +1,5 @@
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
-import { Stream } from '@elysiajs/stream';
 import mqtt from 'mqtt';
 import EventEmitter from 'events';
 import './MockDataGenerator';
@@ -25,22 +24,45 @@ client.on('message', (topic, message) => {
     }
 });
 
-// 3. Initialize Elysia with CORS and SSE Stream
+// 3. Initialize Elysia with CORS and SSE Stream using async generator
 const app = new Elysia()
     .use(cors()) // Allows Next.js (port 3000) to talk to Bun (port 3001)
     .get('/', () => 'Smart Waste Backend is running!')
-    .get('/stream', () => new Stream((stream) => {
-        // When a new web client connects, listen to the emitter
+    .get('/stream', async function* ({ set }) {
+        set.headers['content-type'] = 'text/event-stream';
+        set.headers['cache-control'] = 'no-cache';
+        set.headers['connection'] = 'keep-alive';
+
+        const queue: any[] = [];
+        let resolveNext: (() => void) | null = null;
+
         const listener = (data: any) => {
-            stream.send(data);
+            queue.push(data);
+            if (resolveNext) {
+                resolveNext();
+                resolveNext = null;
+            }
         };
+
         dataEmitter.on('sensor_update', listener);
-        
-        // Clean up memory if the web page closes
-        stream.on('close', () => {
+
+        try {
+            while (true) {
+                if (queue.length === 0) {
+                    await new Promise<void>((resolve) => {
+                        resolveNext = resolve;
+                    });
+                }
+                while (queue.length > 0) {
+                    const data = queue.shift();
+                    yield `data: ${JSON.stringify(data)}\n\n`;
+                }
+            }
+        } finally {
+            console.log('🔌 Client disconnected, cleaning up data emitter listener.');
             dataEmitter.off('sensor_update', listener);
-        });
-    }))
+        }
+    })
     .listen(3001);
 
 console.log(`🦊 Elysia SSE API is running at ${app.server?.hostname}:${app.server?.port}`);
