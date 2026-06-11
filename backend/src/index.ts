@@ -55,7 +55,7 @@ const app = new Elysia()
                 }
                 while (queue.length > 0) {
                     const data = queue.shift();
-                    yield `data: ${JSON.stringify(data)}\n\n`;
+                    yield JSON.stringify(data);
                 }
             }
         } finally {

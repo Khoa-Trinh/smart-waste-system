@@ -28,9 +28,11 @@ export default function Dashboard() {
 
   // Maintain a live activity feed of the latest events
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   // Connect to the Bun SSE Stream
   useEffect(() => {
+    setMounted(true);
     const eventSource = new EventSource("http://localhost:3001/stream");
 
     eventSource.onmessage = (event) => {
@@ -276,8 +278,10 @@ export default function Dashboard() {
 
                     <div className="flex justify-between items-center text-[10px] text-neutral-500 font-mono">
                       <span>TELEMETRY</span>
-                      <span>
-                        {new Date(floor.timestamp).toLocaleTimeString()}
+                      <span suppressHydrationWarning>
+                        {mounted
+                          ? new Date(floor.timestamp).toLocaleTimeString()
+                          : ""}
                       </span>
                     </div>
                   </div>
@@ -321,8 +325,13 @@ export default function Dashboard() {
                         <span className="font-semibold text-white">
                           Floor {log.floor < 10 ? `0${log.floor}` : log.floor}
                         </span>
-                        <span className="text-[10px] opacity-75">
-                          {new Date(log.timestamp).toLocaleTimeString()}
+                        <span
+                          className="text-[10px] opacity-75"
+                          suppressHydrationWarning
+                        >
+                          {mounted
+                            ? new Date(log.timestamp).toLocaleTimeString()
+                            : ""}
                         </span>
                       </div>
                       <p className="text-[11px] text-neutral-500 truncate">
